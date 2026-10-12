@@ -302,9 +302,13 @@ function otShowCalculatedFooting(selectId, text) {
 }
 
 function otWireFootingDropdowns() {
+  // "input" fires before "change" on a select, and the page-wide rerun listens to both -- so the
+  // driver has to be set on "input", before that first rerun puts the calculated option back.
   ["otFootDia", "otFootDepth"].forEach((id) => {
-    $(id).addEventListener("change", () => {
-      if ($(id).value !== "calc") otFootingDriver = id;
+    ["input", "change"].forEach((type) => {
+      $(id).addEventListener(type, () => {
+        if ($(id).value !== "calc") otFootingDriver = id;
+      });
     });
   });
 }
