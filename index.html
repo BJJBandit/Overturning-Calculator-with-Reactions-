@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tank Overturning Calculator with Reactions (AS/NZS 1170.2:2021)</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header class="page-header">
+  <h1>Overturning Calculator with Reactions <span class="tag">circular tank</span></h1>
+  <p class="subtitle">Wind overturning check and base reactions for a circular bin, silo or tank. Wind actions to AS/NZS&nbsp;1170.2:2021.</p>
+</header>
+
+<div class="disclaimer">
+  <strong>Scope &amp; disclaimer:</strong> A preliminary hand-check tool, not a substitute for the Standard or engineering judgement.
+  The tank overturns about its leeward (downwind) base edge: wind drag and roof uplift overturn, self-weight restores. Actions are
+  <strong>unfactored</strong> and compared against a target factor of safety &mdash; an alternative to AS/NZS&nbsp;1170.0 load factors
+  (e.g. 0.9G with W<sub>u</sub>); use one method consistently. Site and design wind speed use the same engine as the
+  <a href="https://wind-actions-to-1170.onrender.com/" target="_blank" rel="noopener">Wind Actions to AS/NZS&nbsp;1170.2</a> calculator.
+  Confirm anchorage, sliding, bearing and shell buckling with a qualified structural engineer.
+</div>
+
+<main>
+  <!-- ============================= 1. TANK ============================= -->
+  <section class="card">
+    <h2>1. Tank</h2>
+    <div class="grid">
+      <div class="field">
+        <label for="tankB">Diameter, b (m)</label>
+        <input type="number" id="tankB" min="0.1" step="0.1" value="2.8" />
+      </div>
+      <div class="field">
+        <label for="tankC">Height, c = h (m)</label>
+        <input type="number" id="tankC" min="0.1" step="0.1" value="4.3" />
+      </div>
+      <div class="field">
+        <label for="tankW">Self-weight, W (kN)</label>
+        <input type="number" id="tankW" min="0" step="0.5" value="25" />
+        <p class="hint">Use the empty (lightest) case for the worst overturning / uplift check.</p>
+      </div>
+      <div class="field">
+        <label for="fos">Target factor of safety, FoS<sub>req</sub></label>
+        <input type="number" id="fos" min="1" step="0.1" value="1.5" />
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================= 2. WIND ============================= -->
+  <section class="card">
+    <h2>2. Site &amp; design wind speed <span class="ref">(AS/NZS 1170.2 Sections 2&ndash;4)</span></h2>
+    <div class="grid">
+      <div class="field">
+        <label for="siteLocation">Site location <span class="ref">(optional, fills in Region)</span></label>
+        <select id="siteLocation">
+          <option value="">— pick manually / not listed —</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="region">Region <span class="ref">(Table 3.1, Figure 3.1)</span></label>
+        <select id="region"></select>
+      </div>
+      <div class="field">
+        <label for="ari">Average recurrence interval, R (years)</label>
+        <select id="ari"></select>
+      </div>
+      <div class="field" id="ariCustomWrap" hidden>
+        <label for="ariCustom">Custom R (years, &ge;5)</label>
+        <input type="number" id="ariCustom" min="5" step="1" value="50" />
+      </div>
+      <div class="field">
+        <label for="terrainCategory">Terrain category <span class="ref">(Cl 4.2.1)</span></label>
+        <select id="terrainCategory">
+          <option value="1">1 &ndash; very exposed / open water</option>
+          <option value="2">2 &ndash; open terrain, grassland</option>
+          <option value="2.5">2.5 &ndash; outer urban / scattered obstructions</option>
+          <option value="3">3 &ndash; suburban / light industrial</option>
+          <option value="4" selected>4 &ndash; city centres, dense large obstructions</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="mdMode">Wind direction multiplier, M<sub>d</sub></label>
+        <select id="mdMode">
+          <option value="tank" selected>1.0 &ndash; circular tank (Cl 3.3)</option>
+          <option value="table">Governing direction from Table 3.2</option>
+        </select>
+      </div>
+    </div>
+    <p class="hint">Reference height z is the tank height c. * in the location list = medium-confidence region match &mdash; verify against Figure&nbsp;3.1.</p>
+    <div id="locationNote"></div>
+
+    <details class="subpanel">
+      <summary>Shielding multiplier, M<sub>s</sub> <span class="ref">(Clause 4.3, Table 4.2)</span></summary>
+      <div class="grid">
+        <div class="field">
+          <label for="shieldingS">Shielding parameter, s (1.5&ndash;12)</label>
+          <input type="number" id="shieldingS" min="0" step="0.1" placeholder="blank = no shielding (Ms = 1.0)" />
+        </div>
+      </div>
+    </details>
+
+    <details class="subpanel">
+      <summary>Topographic multiplier, M<sub>t</sub> <span class="ref">(Clause 4.4)</span></summary>
+      <div class="grid">
+        <div class="field">
+          <label for="mtMode">Site topography</label>
+          <select id="mtMode">
+            <option value="flat" selected>Flat / no local topographic feature (Mt = 1.0)</option>
+            <option value="hill">Hill, ridge or escarpment &ndash; calculate Mh</option>
+            <option value="manual">Enter Mt manually</option>
+          </select>
+        </div>
+        <div class="field" id="mtManualWrap" hidden>
+          <label for="mtManual">M<sub>t</sub> (manual)</label>
+          <input type="number" id="mtManual" min="1" step="0.01" value="1.0" />
+        </div>
+      </div>
+      <div class="grid" id="mhInputs" hidden>
+        <div class="field">
+          <label for="mhH">Feature height, H (m)</label>
+          <input type="number" id="mhH" min="0" step="0.1" value="0" />
+        </div>
+        <div class="field">
+          <label for="mhLu">L<sub>u</sub> &ndash; upwind distance to half-height point (m)</label>
+          <input type="number" id="mhLu" min="1" step="0.1" value="100" />
+        </div>
+        <div class="field">
+          <label for="mhX">x &ndash; distance from tank to crest (m, negative = upwind)</label>
+          <input type="number" id="mhX" step="0.1" value="0" />
+        </div>
+        <div class="field">
+          <label for="mhType">Feature type</label>
+          <select id="mhType">
+            <option value="hill">Hill / ridge</option>
+            <option value="escarpment">Escarpment</option>
+          </select>
+        </div>
+        <div class="field" id="mhElevWrap" hidden>
+          <label for="mhElev">Site elevation, E (m AMSL)</label>
+          <input type="number" id="mhElev" min="0" step="1" value="0" />
+        </div>
+      </div>
+    </details>
+
+    <label class="check"><input type="checkbox" id="ulsMin" /> Apply the 30&nbsp;m/s minimum design wind speed (Clause 2.3, ultimate limit states)</label>
+
+    <div class="results" id="windResults"></div>
+  </section>
+
+  <!-- ============================= 3. ACTIONS ============================= -->
+  <section class="card">
+    <h2>3. Wind actions on the tank <span class="ref">(Appendix A)</span></h2>
+    <div class="grid">
+      <div class="field">
+        <label for="cshp">Drag shape factor, C<sub>shp</sub> <span class="ref">(Cl A.5.2.1)</span></label>
+        <input type="number" id="cshp" min="0" step="0.01" value="0.63" />
+      </div>
+      <div class="field">
+        <label for="roofCase">Roof uplift case</label>
+        <select id="roofCase">
+          <option value="sealed" selected>Sealed roof (Cp,e = −0.8, Cp,i = 0)</option>
+          <option value="dominant">Sealed roof with dominant opening (Cp,i = +0.7)</option>
+          <option value="vented">Vented / open-top (Cp,i from Eq. A.5(5))</option>
+          <option value="none">No roof uplift</option>
+        </select>
+      </div>
+    </div>
+    <div class="results" id="actionResults"></div>
+  </section>
+
+  <!-- ============================= 4. OVERTURNING ============================= -->
+  <section class="card">
+    <h2>4. Overturning about the leeward base edge</h2>
+    <div class="results first" id="momentResults"></div>
+  </section>
+
+  <!-- ============================= 5. EDGE REACTIONS ============================= -->
+  <section class="card">
+    <h2>5. Vertical base reactions &ndash; far (windward) &amp; near (leeward) edges</h2>
+    <p class="hint">Modelled as two edge supports one diameter apart. Net vertical N = W &minus; U at the centre; the wind couple shifts
+      reaction to the leeward edge: R = N/2 &plusmn; M/b. Positive = compression into the foundation; a negative far-side reaction
+      is net uplift that hold-down anchors must carry.</p>
+    <div class="grid">
+      <div class="field">
+        <label for="reactionBasis">Moment used for reactions, M</label>
+        <select id="reactionBasis">
+          <option value="sheet" selected>M_OT = M_w + M_u (as spreadsheet, conservative)</option>
+          <option value="statics">M_w only (uplift taken through base centre)</option>
+        </select>
+      </div>
+    </div>
+    <div class="split">
+      <div class="results first" id="edgeResults"></div>
+      <figure class="diagram">
+        <svg id="fbdSvg" viewBox="0 0 420 380" role="img" aria-label="Free-body diagram of the tank with base reactions"></svg>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ============================= 6. N-POINT REACTIONS ============================= -->
+  <section class="card">
+    <h2>6. Circular base &ndash; n discrete reaction points</h2>
+    <p class="hint">Points spaced evenly around the base circle (radius R = b/2), point 1 at the farthest windward position.
+      Lever arm x<sub>i</sub> = R&middot;cos&thinsp;&theta;<sub>i</sub> along the wind. Rigid-base linear distribution:
+      R<sub>i</sub> = N/n &minus; M&middot;x<sub>i</sub> / &Sigma;x<sub>i</sub>&sup2;.</p>
+    <div class="grid">
+      <div class="field">
+        <label for="nPoints">Number of reaction points, n (3&ndash;12)</label>
+        <input type="number" id="nPoints" min="3" max="12" step="1" value="6" />
+      </div>
+    </div>
+    <div id="pointResults"></div>
+    <div class="split">
+      <div id="pointSummary"></div>
+      <figure class="diagram">
+        <svg id="planSvg" viewBox="0 0 380 340" role="img" aria-label="Plan of reaction points around the tank base"></svg>
+        <figcaption class="hint">Wind from the left. Blue = compression, amber = uplift (hold-down). Dotted line = geometric axis;
+          red dashed line = zero-reaction (neutral) axis where it falls near the base.</figcaption>
+      </figure>
+    </div>
+    <p class="note">For odd n there is no point at the leeward position (&theta; = 180&deg;), so the peak compression falls between
+      points. A flexible ring beam or a bolt group with prying will redistribute load &mdash; this is a rigid-base idealisation.</p>
+  </section>
+</main>
+
+<footer>
+  Based on the Overturning tab of Wind_Actions_AS-NZS1170.2.xlsx. Wind speed tables and functions (wind/data.js, wind/calc.js) are from
+  the Wind Actions to AS/NZS&nbsp;1170.2 calculator.
+</footer>
+
+<script src="wind/data.js"></script>
+<script src="wind/calc.js"></script>
+<script src="overturning.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
