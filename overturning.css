@@ -107,3 +107,55 @@ tr.ot-governing td { font-weight: 600; background: var(--bg); }
 .ot-c-weight { stroke: var(--text-muted); fill: var(--text-muted); }
 .ot-c-comp { stroke: var(--neg); fill: var(--neg); }
 .ot-c-tension { stroke: var(--amber); fill: var(--amber); }
+
+/* -- printing / save as PDF -- */
+.ot-print-header { display: none; }
+
+@media print {
+  :root {
+    --bg: #ffffff;
+    --card-bg: #ffffff;
+    --text: #1c2530;
+    --text-muted: #4a5866;
+    --border: #c5ced6;
+    --accent: #1d5c8a;
+    --accent-dark: #123f5f;
+    --warn-bg: #fff6e5;
+    --warn-border: #e8c368;
+    --pos: #b6493a;
+    --neg: #1d6fa5;
+    --ok: #1e7d4f;
+    --amber: #b9741a;
+  }
+
+  @page { margin: 12mm; }
+
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  body { font-size: 10.5pt; }
+  main, .page-header, .disclaimer, footer { max-width: none; }
+  .page-header { padding-top: 0.5rem; }
+
+  .ot-print-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0 1.25rem 0.4rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .ot-print-header strong { color: var(--text); }
+
+  button, .ot-no-print { display: none !important; }
+  .ot-status { color: #fff; }
+
+  .card { break-inside: auto; margin-bottom: 1rem; padding: 0.9rem 1.1rem 1rem; }
+  h2, h3, h4, summary { break-after: avoid; }
+  tr, figure, svg, .ot-stat, .ot-headline, .warning, .compass-wrap, .iso-wrap, .windrose-wrap { break-inside: avoid; }
+
+  .ot-table-wrap, .ot-table-wrap.tall { overflow: visible; max-height: none; }
+  table { font-size: 0.78rem; }
+  th, td { padding: 0.25rem 0.4rem; }
+}

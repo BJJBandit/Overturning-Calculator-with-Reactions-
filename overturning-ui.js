@@ -483,11 +483,47 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Once calculated, keep every section in step with the inputs.
   const rerun = (evt) => {
-    if (!otHasRun || evt.target.closest("#pressureDiagrams")) return;
+    if (!otHasRun || evt.target.closest("#pressureDiagrams") || evt.target.id === "otProject") return;
     otRunAll();
   };
   document.querySelector("main").addEventListener("input", rerun);
   document.querySelector("main").addEventListener("change", rerun);
 
   otRunAll();
+});
+
+// ---------------------------------------------------------------------------
+// Print / save as PDF
+// ---------------------------------------------------------------------------
+
+// Collapsed <details> panels don't print their contents, so open them all for the printout and
+// put them back afterwards.
+let otClosedForPrint = [];
+
+function otBeforePrint() {
+  const project = $("otProject").value.trim();
+  const header = $("otPrintHeader");
+  header.textContent = "";
+  const left = document.createElement("strong");
+  left.textContent = project || "Overturning & hold-down calculation";
+  const right = document.createElement("span");
+  right.textContent = `Printed ${new Date().toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" })}`;
+  header.append(left, right);
+
+  otClosedForPrint = Array.from(document.querySelectorAll("details:not([open])"));
+  otClosedForPrint.forEach((d) => (d.open = true));
+}
+
+function otAfterPrint() {
+  otClosedForPrint.forEach((d) => (d.open = false));
+  otClosedForPrint = [];
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  window.addEventListener("beforeprint", otBeforePrint);
+  window.addEventListener("afterprint", otAfterPrint);
+  $("otPrint").addEventListener("click", () => {
+    if (!otHasRun) otRunAll();
+    window.print();
+  });
 });

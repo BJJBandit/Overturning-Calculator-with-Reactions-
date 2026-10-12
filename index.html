@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="overturning.css" />
 </head>
 <body>
+<div id="otPrintHeader" class="ot-print-header"></div>
 <header class="page-header">
   <h1>Overturning Calculator with Reactions <span class="tag">AS/NZS 1170.2:2021</span></h1>
   <p class="subtitle">Wind overturning, stability and hold-down point reactions for rectangular buildings and circular tanks, built on the Wind Actions to AS/NZS&nbsp;1170.2 calculator.</p>
@@ -471,6 +472,20 @@
     </div>
 
     <div id="otPointResults" class="results" hidden></div>
+  </section>
+
+  <!-- ============================= SECTION: PRINT ============================= -->
+  <section class="card ot-no-print">
+    <h2>6. Print results</h2>
+    <p class="hint">Prints every section &mdash; inputs, wind speeds, pressures, overturning and hold-down results &mdash; with all the
+      collapsed panels opened. Choose &ldquo;Save as PDF&rdquo; as the printer to keep a PDF copy.</p>
+    <div class="grid">
+      <div class="field">
+        <label for="otProject">Project / job reference <span class="ref">(optional, shown at the top of the printout)</span></label>
+        <input type="text" id="otProject" placeholder="e.g. 2026-041 Tank T3, Lutana" />
+      </div>
+    </div>
+    <button id="otPrint" class="primary">Print / save as PDF</button>
   </section>
 </main>
 

@@ -66,6 +66,9 @@ factors — set γ_G and γ_W to 1.0 for a pure factor-of-safety check. Pick eit
 diameter or a footing depth from the dropdowns and the other is filled in with the minimum for a round
 footing (volume = π D²/4 × depth) at the largest point; the table gives it for every point.
 
+**Printing** — Section 6 prints every section (or saves a PDF via the browser's "Save as PDF" printer),
+with all collapsed panels opened and an optional project reference and the date at the top.
+
 ## Assumptions and limits
 
 - Preliminary hand check only; have results verified by a qualified structural engineer.
