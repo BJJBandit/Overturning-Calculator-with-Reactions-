@@ -1,0 +1,109 @@
+/* Additions for the overturning & hold-down sections -- builds on style.css. */
+
+:root {
+  --ok: #1e7d4f;
+  --amber: #b9741a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ok: #5fca93;
+    --amber: #e0a550;
+  }
+}
+
+.field .hint { margin: 0.3rem 0 0; }
+
+.ot-headline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.ot-stat {
+  flex: 1 1 160px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.8rem;
+  background: var(--bg);
+}
+
+.ot-stat-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.ot-stat-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.ot-stat-unit,
+.ot-stat-sub {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.ot-status {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.12rem 0.55rem;
+  border-radius: 999px;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.ot-status.ok { background: var(--ok); }
+.ot-status.hold { background: var(--amber); }
+
+@media (prefers-color-scheme: dark) {
+  .ot-status { color: #14181d; }
+}
+
+.ot-tension { color: var(--amber); font-weight: 600; }
+
+.ot-table-wrap { overflow-x: auto; }
+.ot-table-wrap.tall { max-height: 420px; overflow-y: auto; }
+.ot-table-wrap td.num, .ot-table-wrap th.num { white-space: nowrap; }
+tr.ot-governing td { font-weight: 600; background: var(--bg); }
+
+/* diagram above its (wide) table */
+.ot-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.ot-split .ot-diagram { order: -1; }
+
+.ot-diagram {
+  margin: 0;
+  text-align: center;
+}
+
+.ot-diagram svg {
+  width: 100%;
+  max-width: 420px;
+  height: auto;
+}
+
+.ot-outline { fill: var(--accent); fill-opacity: 0.08; stroke: var(--text-muted); stroke-width: 2; }
+.ot-pcd { fill: none; stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 4 4; }
+.ot-ground { stroke: var(--text-muted); stroke-width: 1.5; }
+.ot-text { fill: var(--text-muted); font-size: 11px; }
+.ot-label { font-size: 12px; font-weight: 700; stroke: none; }
+.ot-ptnum { fill: var(--text); font-size: 10px; font-weight: 600; }
+.ot-arrow { stroke-width: 3; stroke-linecap: round; }
+
+.ot-c-wind { stroke: var(--accent); fill: var(--accent); }
+.ot-c-drag { stroke: var(--pos); fill: var(--pos); }
+.ot-c-uplift { stroke: var(--ok); fill: var(--ok); }
+.ot-c-weight { stroke: var(--text-muted); fill: var(--text-muted); }
+.ot-c-comp { stroke: var(--neg); fill: var(--neg); }
+.ot-c-tension { stroke: var(--amber); fill: var(--amber); }

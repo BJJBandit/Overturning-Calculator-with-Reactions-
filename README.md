@@ -1,14 +1,14 @@
 # Overturning Calculator with Reactions
 
-A static web calculator for the wind overturning check and base reactions of a circular bin, silo or
-tank. It reproduces the **Overturning** tab of `Wind_Actions_AS-NZS1170.2.xlsx`, with the wind
-actions determined by the [Wind Actions to AS/NZS 1170.2](https://wind-actions-to-1170.onrender.com/)
-calculator's engine.
+A static web calculator for wind overturning, stability and hold-down point reactions of
+square / rectangular buildings and circular tanks. It is built directly on the
+[Wind Actions to AS/NZS 1170.2](https://wind-actions-to-1170.onrender.com/) calculator: sections 1–3
+(building, site & design wind speed, design wind pressure) are that calculator's own code, and
+sections 4–5 add the overturning check and hold-down points.
 
 ## Running it
 
-No build step. Open `index.html` over HTTP — for example host the folder on Render / GitHub Pages as
-a static site, or locally:
+No build step — host the folder as a static site (Render, publish directory `.`), or locally:
 
 ```
 powershell -ExecutionPolicy Bypass -File serve.ps1
@@ -16,45 +16,55 @@ powershell -ExecutionPolicy Bypass -File serve.ps1
 
 then browse to http://localhost:8765/.
 
-## What it calculates
-
-| Step | Result | Spreadsheet source |
-| --- | --- | --- |
-| Site & design wind speed | V_R, M_c, M_d, M_z,cat, M_s, M_t → V_sit, V_des, q_z | Inputs, Wind Speed |
-| Wall drag | F_w = C_shp · q_z · b · c, acting at c/2 (C_shp = 0.63) | Wall Drag |
-| Roof uplift | U = \|p_roof\| · π b²/4, net C_p from the roof case | Roof & Internal |
-| Overturning | M_OT = M_w + M_u, M_R = W · b/2, ratio vs FoS_req, W required | Overturning rows 19–25 |
-| Edge reactions | N = W − U, R_near / R_far = N/2 ± M/b, hold-down, base shear | Overturning rows 30–35 |
-| n-point reactions | R_i = N/n − M · x_i / Σx_i², hold-down T_i, neutral-axis offset | Overturning rows 48–71 |
-
-With the default inputs (Hobart, Region A4, R = 50, TC4, b = 2.8 m, c = 4.3 m, W = 25 kN,
-FoS = 1.5, n = 6) every result matches the spreadsheet.
-
 ## Files
 
-- `index.html`, `style.css`, `app.js` — page and UI wiring.
-- `overturning.js` — the overturning / reactions calculation, with spreadsheet cell references.
-- `wind/data.js`, `wind/calc.js` — unmodified copies of the Wind Actions to AS/NZS 1170.2
-  calculator's tables and functions (from `BJJBandit/Wind-Actions-to-1170`). Re-copy them when that
-  project changes.
-- `serve.ps1` — minimal local static server.
+| File | Purpose |
+| --- | --- |
+| `index.html`, `style.css` | Wind calculator page, with sections 4–5 added |
+| `data.js`, `calc.js`, `app.js` | Unmodified from `BJJBandit/Wind-Actions-to-1170` — re-copy when that project changes |
+| `overturning.js` | Overturning and hold-down calculation engine |
+| `overturning-ui.js`, `overturning.css` | Form wiring, results tables and diagrams for sections 4–5 |
+| `serve.ps1` | Minimal local static server |
 
-## Differences from the spreadsheet
+## What sections 4–5 calculate
 
-- **Wind speed** comes from the wind calculator's tables rather than the workbook's `Lists` tab, so
-  M_z,cat is interpolated for the actual height, R covers every tabulated value for every region,
-  and shielding / hill-shape topography can be calculated.
-- **M_d** defaults to 1.0 (circular tank), as in the spreadsheet; the governing Table 3.2 value can
-  be selected instead.
-- **30 m/s minimum** (Clause 2.3, ULS) is flagged when V_sit is below it and can be switched on. It
-  is off by default to match the spreadsheet.
-- **Roof case** is selectable (sealed, dominant opening, vented, none). The spreadsheet's Overturning
-  tab always uses the sealed case. A net inward roof pressure is taken as zero uplift.
-- **Moment used for reactions** defaults to M_OT = M_w + M_u, as the spreadsheet does. Because the
-  uplift U acts through the base centre it is already in N = W − U, so including M_u again is
-  conservative rather than statically exact; the "M_w only" option gives the equilibrium answer.
+**Shape, size and height** come from Section 1: a rectangular building (W × L, average roof height
+h, roof type and pitch) or a circular bin / silo / tank (diameter D, height h).
 
-## Scope
+**Wind actions, per wind direction**
 
-Preliminary hand-check only. Actions are unfactored and compared with a target factor of safety.
-Sliding, bearing, anchorage design, shell buckling and dynamic response are not covered.
+- Rectangular building — all 4 orthogonal axes, each with its own V_des,θ from Section 2, and both
+  roof load cases of Clause 5.4.1 (8 load cases):
+  - horizontal force from the windward wall (Table 5.2(A)) and leeward wall (Table 5.2(B));
+  - roof uplift from the Table 5.3(A) zones by distance from the windward edge, or the Table
+    5.3(B)/(C) upwind / downwind slopes for pitch ≥ 10° with wind normal to the ridge (including the
+    horizontal component of the slope pressures);
+  - optional internal pressure under the roof (largest C_p,i of the Section 3 case).
+- Circular tank — governing V_des from any direction, wall drag C_shp = 0.63 at h/2 (Cl A.5.2.1) and
+  uniform roof uplift, net C_p = −0.8 by default (Table A.4(A), sealed).
+
+**Stability** about the leeward base edge: γ_G·W·d/2 ≥ γ_W·M_OT, where
+M_OT = ΣF·z + ΣU·(lever to the leeward edge). Defaults γ_G = 0.9, γ_W = 1.0 (AS/NZS 1170.0 stability
+combination with ultimate wind). For a working-load factor-of-safety check use γ_G = 1.0, γ_W = FoS.
+
+**Hold-down points**
+
+- Circle: pitch circle diameter (PCD) and number of points, point 1 at the windward position.
+- Rectangle: an n_W × n_L array, perimeter only or full grid, with an edge distance from the wall
+  line.
+
+Reactions use a rigid-base linear distribution about the centroid of the point group:
+R_i = N/n + M·s_i / Σs_i², with N = γ_G·W − γ_W·U, M the factored overturning moment about the plan
+centre at base level, and s_i the point's distance downwind of the centroid. Each point reports its
+minimum reaction per wind direction and the envelope hold-down tension and compression.
+
+## Assumptions and limits
+
+- Preliminary hand check only; have results verified by a qualified structural engineer.
+- Wind is checked along the 4 orthogonal axes only (not at 45°), and wall friction drag (Cl 5.5) is
+  ignored.
+- Wind parallel to the ridge with pitch ≥ 10° uses the Table 5.3(A) zones for roof uplift.
+- Hip roofs are treated as gable-equivalent slopes; monoslope roofs take the wind as blowing up the
+  slope for both front and back directions.
+- Self-weight acts at the plan centre. Every point is assumed able to take tension and compression.
+- Sliding, bearing, anchor / foundation design, shell buckling and dynamic response are not covered.

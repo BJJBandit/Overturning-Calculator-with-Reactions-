@@ -1,100 +1,218 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
+<meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Tank Overturning Calculator with Reactions (AS/NZS 1170.2:2021)</title>
+<title>Building Overturning &amp; Hold-down Calculator (AS/NZS 1170.2:2021)</title>
 <link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="overturning.css" />
 </head>
 <body>
 <header class="page-header">
-  <h1>Overturning Calculator with Reactions <span class="tag">circular tank</span></h1>
-  <p class="subtitle">Wind overturning check and base reactions for a circular bin, silo or tank. Wind actions to AS/NZS&nbsp;1170.2:2021.</p>
+  <h1>Overturning Calculator with Reactions <span class="tag">AS/NZS 1170.2:2021</span></h1>
+  <p class="subtitle">Wind overturning, stability and hold-down point reactions for rectangular buildings and circular tanks, built on the Wind Actions to AS/NZS&nbsp;1170.2 calculator.</p>
 </header>
 
 <div class="disclaimer">
-  <strong>Scope &amp; disclaimer:</strong> A preliminary hand-check tool, not a substitute for the Standard or engineering judgement.
-  The tank overturns about its leeward (downwind) base edge: wind drag and roof uplift overturn, self-weight restores. Actions are
-  <strong>unfactored</strong> and compared against a target factor of safety &mdash; an alternative to AS/NZS&nbsp;1170.0 load factors
-  (e.g. 0.9G with W<sub>u</sub>); use one method consistently. Site and design wind speed use the same engine as the
-  <a href="https://wind-actions-to-1170.onrender.com/" target="_blank" rel="noopener">Wind Actions to AS/NZS&nbsp;1170.2</a> calculator.
-  Confirm anchorage, sliding, bearing and shell buckling with a qualified structural engineer.
+  <strong>Scope &amp; disclaimer:</strong> This is a preliminary/educational tool, not a substitute for the full Standard or engineering judgement.
+  It covers Sections&nbsp;2&ndash;4 (site &amp; design wind speed) and a simplified Section&nbsp;5 (enclosed rectangular buildings, walls and roof pitch&nbsp;&lt;10&deg; only).
+  It does <strong>not</strong> cover: Section&nbsp;6 dynamic response (C<sub>dyn</sub> is left as a manual input, default 1.0), Appendices A&ndash;E,
+  area reduction/combination/local pressure/porous cladding factors (K<sub>a</sub>, K<sub>c</sub>, K<sub>l</sub>, K<sub>p</sub> are taken as 1.0),
+  NZ lee-zone multipliers, C/D coastal-distance interpolation, or pitched roofs &ge;10&deg;. Always verify against AS/NZS&nbsp;1170.2:2021 and have
+  results checked by a suitably qualified engineer.
+  Sections&nbsp;4&ndash;5 add a whole-building overturning check and a rigid-base hold-down distribution &mdash; a preliminary hand check that
+  ignores wall friction drag, wind at 45&deg; to the axes, and the flexibility of the base. Sliding, bearing and anchor design are not covered.
+  <a href="README.md">Full scope notes &rarr;</a>
 </div>
 
 <main>
-  <!-- ============================= 1. TANK ============================= -->
+  <!-- ============================= SECTION: BUILDING ============================= -->
   <section class="card">
-    <h2>1. Tank</h2>
+    <h2>1. Building <span class="ref">(plan size, height, roof, orientation)</span></h2>
+    <p class="hint">Describe the building first &mdash; its plan dimensions and height are used both for the site-exposure calculation
+      below (average roof height) and for the wall/roof pressure calculation further down.</p>
+
     <div class="grid">
       <div class="field">
-        <label for="tankB">Diameter, b (m)</label>
-        <input type="number" id="tankB" min="0.1" step="0.1" value="2.8" />
+        <label for="buildingType">Building type <span class="ref">(which part of the Standard applies)</span></label>
+        <select id="buildingType"></select>
       </div>
       <div class="field">
-        <label for="tankC">Height, c = h (m)</label>
-        <input type="number" id="tankC" min="0.1" step="0.1" value="4.3" />
+        <label for="importanceLevel">Building importance level <span class="ref">(NCC / AS&#8203;/NZS 1170.0, not 1170.2)</span></label>
+        <select id="importanceLevel">
+          <option value="">— select to suggest an ARI below —</option>
+        </select>
+      </div>
+    </div>
+    <div id="buildingTypeNote"></div>
+    <div id="importanceLevelNote"></div>
+
+    <div class="grid">
+      <div class="field">
+        <label for="buildingSize">Building size <span class="ref">(preset, fills in W &amp; L below)</span></label>
+        <select id="buildingSize">
+          <option value="">— custom / enter below —</option>
+        </select>
       </div>
       <div class="field">
-        <label for="tankW">Self-weight, W (kN)</label>
-        <input type="number" id="tankW" min="0" step="0.5" value="25" />
-        <p class="hint">Use the empty (lightest) case for the worst overturning / uplift check.</p>
+        <label for="bldB">Building width, W = b (m) &ndash; across wind</label>
+        <input type="number" id="bldB" min="0.1" step="0.1" value="20" />
       </div>
       <div class="field">
-        <label for="fos">Target factor of safety, FoS<sub>req</sub></label>
-        <input type="number" id="fos" min="1" step="0.1" value="1.5" />
+        <label for="bldD">Building length, L = d (m) &ndash; along wind</label>
+        <input type="number" id="bldD" min="0.1" step="0.1" value="15" />
       </div>
+      <div class="field">
+        <label for="bldH">Average roof height, h = z (m)</label>
+        <input type="number" id="bldH" min="0.1" step="0.1" value="10" />
+      </div>
+      <div class="field">
+        <label for="roofType">Roof type</label>
+        <select id="roofType"></select>
+      </div>
+      <div class="field">
+        <label for="roofPitch">Roof pitch, α (degrees)</label>
+        <input type="number" id="roofPitch" min="0" max="45" step="1" value="5" />
+      </div>
+      <div class="field">
+        <label for="azimuth">Building axis (θ=0°) bearing from true North (°)</label>
+        <select id="azimuth"></select>
+      </div>
+    </div>
+    <p class="hint">Ridge runs parallel to W (across the θ=0° wind, Section 2). Section 3 below calculates pressures for all 4
+      building orthogonal axes automatically, so wind direction relative to the ridge no longer needs to be picked here.</p>
+
+    <div class="diagram-row">
+    <div class="compass-wrap">
+      <svg id="compassSvg" viewBox="0 0 400 360" width="360" height="324" role="img" aria-label="Relationship of wind directions and building orthogonal axes, drag to rotate">
+        <!-- Cardinal direction spokes and beta-angle labels (fixed -- true North never rotates), styled after
+             AS/NZS 1170.2:2021 Figure 2.2 "Relationship of wind directions and building orthogonal axes". -->
+        <g class="orient-spokes">
+          <line x1="210" y1="190" x2="210.0" y2="85.0" />
+          <line x1="210" y1="190" x2="284.2" y2="115.8" />
+          <line x1="210" y1="190" x2="315.0" y2="190.0" />
+          <line x1="210" y1="190" x2="284.2" y2="264.2" />
+          <line x1="210" y1="190" x2="210.0" y2="295.0" />
+          <line x1="210" y1="190" x2="135.8" y2="264.2" />
+          <line x1="210" y1="190" x2="105.0" y2="190.0" />
+          <line x1="210" y1="190" x2="135.8" y2="115.8" />
+        </g>
+        <g class="orient-spoke-labels">
+          <text x="210.0" y="58.0" text-anchor="middle"><tspan x="210.0">N</tspan><tspan x="210.0" dy="14">β = 0°</tspan></text>
+          <text x="300.5" y="95.5" text-anchor="start"><tspan x="300.5">NE</tspan><tspan x="300.5" dy="14">β = 45°</tspan></text>
+          <text x="338.0" y="186.0" text-anchor="start"><tspan x="338.0">E</tspan><tspan x="338.0" dy="14">β = 90°</tspan></text>
+          <text x="300.5" y="276.5" text-anchor="start"><tspan x="300.5">SE</tspan><tspan x="300.5" dy="14">β = 135°</tspan></text>
+          <text x="210.0" y="322.0" text-anchor="middle"><tspan x="210.0">S</tspan><tspan x="210.0" dy="14">β = 180°</tspan></text>
+          <text x="119.5" y="276.5" text-anchor="end"><tspan x="119.5">SW</tspan><tspan x="119.5" dy="14">β = 225°</tspan></text>
+          <text x="82.0" y="186.0" text-anchor="end"><tspan x="82.0">W</tspan><tspan x="82.0" dy="14">β = 270°</tspan></text>
+          <text x="119.5" y="95.5" text-anchor="end"><tspan x="119.5">NW</tspan><tspan x="119.5" dy="14">β = 315°</tspan></text>
+        </g>
+        <g class="orient-callout" id="calloutCardinal">
+          <line x1="150" y1="34" x2="203" y2="66" />
+          <text x="14" y="30" text-anchor="start">Cardinal directions</text>
+        </g>
+        <g class="orient-callout" id="calloutAxes">
+          <line x1="170" y1="318" x2="196" y2="254" />
+          <text x="14" y="330" text-anchor="start">Building orthogonal axes</text>
+        </g>
+        <g id="buildingGroup">
+          <line id="axisTheta0" class="orient-axis" />
+          <line id="axisTheta90" class="orient-axis" />
+          <path id="arcLeft" class="orient-arc" />
+          <path id="arcRight" class="orient-arc" />
+          <text id="arcLeftLabel" class="orient-arc-label" text-anchor="middle">45°</text>
+          <text id="arcRightLabel" class="orient-arc-label" text-anchor="middle">45°</text>
+          <rect id="buildingRect" class="compass-building" rx="2" />
+          <circle id="buildingCircle" class="compass-building" style="display:none" />
+          <line id="latticeCross1" class="compass-lattice" style="display:none" />
+          <line id="latticeCross2" class="compass-lattice" style="display:none" />
+          <!-- Roof ridge / hip lines (rect glyph only): ridge runs parallel to W (across the
+               theta=0 wind), hip lines run to the corners. Hidden for monoslope and non-rect glyphs. -->
+          <line id="roofRidge" class="compass-ridge" style="display:none" />
+          <line id="roofHip1" class="compass-ridge" style="display:none" />
+          <line id="roofHip2" class="compass-ridge" style="display:none" />
+          <line id="roofHip3" class="compass-ridge" style="display:none" />
+          <line id="roofHip4" class="compass-ridge" style="display:none" />
+          <text id="theta0Label" class="compass-theta-label" text-anchor="middle">θ = 0°</text>
+          <text id="theta90Label" class="compass-theta-label" text-anchor="middle">θ = 90°</text>
+          <!-- Dimension lines: dimW = primary size (W for rect/wall/lattice, diameter for circles),
+               dimL = secondary size (L, rect/lattice only -- hidden for wall/circle glyphs). -->
+          <g id="dimW">
+            <line id="dimWLine" class="compass-dim-line" />
+            <line id="dimWTick1" class="compass-dim-tick" />
+            <line id="dimWTick2" class="compass-dim-tick" />
+            <text id="dimWLabel" class="compass-dim-label" text-anchor="middle"></text>
+          </g>
+          <g id="dimL">
+            <line id="dimLLine" class="compass-dim-line" />
+            <line id="dimLTick1" class="compass-dim-tick" />
+            <line id="dimLTick2" class="compass-dim-tick" />
+            <text id="dimLLabel" class="compass-dim-label" text-anchor="start"></text>
+          </g>
+        </g>
+      </svg>
+      <p class="hint">Drag the compass (or use the dropdown above) to set the building's bearing. θ = 0° is the face used as the origin for the design wind speed table below (Clause 2.3: the governing speed in the sector ±45° either side); the shape at centre reflects the selected building type and, where applicable, the plan dimensions (W × L) entered above. Circular shapes have no orthogonal faces, so the θ axes and ±45° sectors are hidden for those types.</p>
+    </div>
+
+    <div class="iso-wrap">
+      <svg id="isoSvg" viewBox="0 0 280 250" width="260" height="232" role="img" aria-label="Isometric view of the structure"></svg>
+      <p class="hint">A schematic isometric view &mdash; redrawn from the building type, roof type/pitch, and W &times; L &times; h entered above. Fixed viewing angle (not linked to bearing); not to engineering scale.</p>
+    </div>
     </div>
   </section>
 
-  <!-- ============================= 2. WIND ============================= -->
+  <!-- ============================= SECTION: SITE WIND SPEED ============================= -->
   <section class="card">
-    <h2>2. Site &amp; design wind speed <span class="ref">(AS/NZS 1170.2 Sections 2&ndash;4)</span></h2>
+    <h2>2. Site wind speed &amp; design wind speed <span class="ref">(Sections 2&ndash;4)</span></h2>
+
     <div class="grid">
       <div class="field">
-        <label for="siteLocation">Site location <span class="ref">(optional, fills in Region)</span></label>
+        <label for="siteLocation">Site location <span class="ref">(optional, fills in Region below)</span></label>
         <select id="siteLocation">
           <option value="">— pick manually / not listed —</option>
         </select>
+        <p class="hint">* = medium-confidence match (inferred, not directly labelled on the Standard's region map) — verify against Figure 3.1.</p>
       </div>
+
       <div class="field">
         <label for="region">Region <span class="ref">(Table 3.1, Figure 3.1)</span></label>
         <select id="region"></select>
       </div>
+
       <div class="field">
         <label for="ari">Average recurrence interval, R (years)</label>
         <select id="ari"></select>
       </div>
-      <div class="field" id="ariCustomWrap" hidden>
+      <div class="field" id="ari-custom-wrap" hidden>
         <label for="ariCustom">Custom R (years, &ge;5)</label>
-        <input type="number" id="ariCustom" min="5" step="1" value="50" />
+        <input type="number" id="ariCustom" min="5" step="1" value="500" />
       </div>
+
       <div class="field">
         <label for="terrainCategory">Terrain category <span class="ref">(Cl 4.2.1)</span></label>
         <select id="terrainCategory">
           <option value="1">1 &ndash; very exposed / open water</option>
-          <option value="2">2 &ndash; open terrain, grassland</option>
+          <option value="2" selected>2 &ndash; open terrain, grassland</option>
           <option value="2.5">2.5 &ndash; outer urban / scattered obstructions</option>
           <option value="3">3 &ndash; suburban / light industrial</option>
-          <option value="4" selected>4 &ndash; city centres, dense large obstructions</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="mdMode">Wind direction multiplier, M<sub>d</sub></label>
-        <select id="mdMode">
-          <option value="tank" selected>1.0 &ndash; circular tank (Cl 3.3)</option>
-          <option value="table">Governing direction from Table 3.2</option>
+          <option value="4">4 &ndash; city centres, dense large obstructions</option>
         </select>
       </div>
     </div>
-    <p class="hint">Reference height z is the tank height c. * in the location list = medium-confidence region match &mdash; verify against Figure&nbsp;3.1.</p>
+
+    <p class="hint">Average roof height (h = z) and building bearing are set in the Building section above.</p>
+
     <div id="locationNote"></div>
 
     <details class="subpanel">
       <summary>Shielding multiplier, M<sub>s</sub> <span class="ref">(Clause 4.3, Table 4.2)</span></summary>
+      <p class="hint">M<sub>s</sub> is forced to 1.0 automatically for h&nbsp;&gt;&nbsp;25&nbsp;m. Calculating the shielding parameter (s) from
+        upwind building geometry (Cl 4.3.3) is not automated here &mdash; enter s directly if known, otherwise leave blank for the conservative
+        default (no shielding credit, M<sub>s</sub>&nbsp;=&nbsp;1.0).</p>
       <div class="grid">
         <div class="field">
-          <label for="shieldingS">Shielding parameter, s (1.5&ndash;12)</label>
-          <input type="number" id="shieldingS" min="0" step="0.1" placeholder="blank = no shielding (Ms = 1.0)" />
+          <label for="shieldingS">Shielding parameter, s (1.5&ndash;12, Table 4.2)</label>
+          <input type="number" id="shieldingS" min="0" step="0.1" placeholder="blank = no shielding (Ms=1.0)" />
         </div>
       </div>
     </details>
@@ -105,9 +223,9 @@
         <div class="field">
           <label for="mtMode">Site topography</label>
           <select id="mtMode">
-            <option value="flat" selected>Flat / no local topographic feature (Mt = 1.0)</option>
-            <option value="hill">Hill, ridge or escarpment &ndash; calculate Mh</option>
-            <option value="manual">Enter Mt manually</option>
+            <option value="flat" selected>Flat / no local topographic feature (M<sub>t</sub> = 1.0)</option>
+            <option value="hill">Hill, ridge or escarpment &ndash; calculate M<sub>h</sub></option>
+            <option value="manual">Enter M<sub>t</sub> manually</option>
           </select>
         </div>
         <div class="field" id="mtManualWrap" hidden>
@@ -115,7 +233,13 @@
           <input type="number" id="mtManual" min="1" step="0.01" value="1.0" />
         </div>
       </div>
-      <div class="grid" id="mhInputs" hidden>
+      <div id="mhInputs" hidden>
+        <p class="hint">Sourcing H and L<sub>u</sub>: draw a line along the wind direction, through the site and the upwind crest, in
+          <strong>Google Earth</strong> (desktop/Pro) and use its elevation profile / path tool &mdash; read H as the rise to the crest and
+          L<sub>u</sub> as the distance back from the crest to where the profile drops to half of H. Google Earth's terrain is SRTM-derived
+          (~30&nbsp;m grid) &mdash; fine for a preliminary check, but for a site near a significant hill/escarpment prefer an official DEM/contour
+          source (Geoscience Australia's ELVIS, LINZ data in NZ, or a site survey) for the final design value.</p>
+        <div class="grid">
         <div class="field">
           <label for="mhH">Feature height, H (m)</label>
           <input type="number" id="mhH" min="0" step="0.1" value="0" />
@@ -125,112 +249,185 @@
           <input type="number" id="mhLu" min="1" step="0.1" value="100" />
         </div>
         <div class="field">
-          <label for="mhX">x &ndash; distance from tank to crest (m, negative = upwind)</label>
+          <label for="mhX">x &ndash; distance from structure to crest (m, negative = upwind)</label>
           <input type="number" id="mhX" step="0.1" value="0" />
         </div>
         <div class="field">
-          <label for="mhType">Feature type</label>
+          <label for="mhType">Feature type (affects downwind L<sub>2</sub>)</label>
           <select id="mhType">
             <option value="hill">Hill / ridge</option>
             <option value="escarpment">Escarpment</option>
           </select>
         </div>
+        <div class="field">
+          <label for="mhA0"><input type="checkbox" id="mhA0" /> Region A0 (uses M<sub>t</sub> = 0.5 + 0.5M<sub>h</sub>)</label>
+        </div>
         <div class="field" id="mhElevWrap" hidden>
-          <label for="mhElev">Site elevation, E (m AMSL)</label>
+          <label for="mhElev">Site elevation above sea level, E (m) &ndash; A4/NZ1-4 sites &gt;500 m AMSL only</label>
           <input type="number" id="mhElev" min="0" step="1" value="0" />
+        </div>
         </div>
       </div>
     </details>
 
-    <label class="check"><input type="checkbox" id="ulsMin" /> Apply the 30&nbsp;m/s minimum design wind speed (Clause 2.3, ultimate limit states)</label>
+    <button id="calcSpeeds" class="primary">Calculate wind speeds</button>
 
-    <div class="results" id="windResults"></div>
+    <div id="speedResults" class="results" hidden></div>
   </section>
 
-  <!-- ============================= 3. ACTIONS ============================= -->
+  <!-- ============================= SECTION: DESIGN WIND PRESSURE ============================= -->
   <section class="card">
-    <h2>3. Wind actions on the tank <span class="ref">(Appendix A)</span></h2>
+    <h2>3. Design wind pressure &ndash; enclosed rectangular building <span class="ref">(Section 5, simplified)</span></h2>
+    <p class="hint">Calculates wall and roof pressures for <strong>all 4 building orthogonal axes</strong> (Clause 2.5.2's minimum), each
+      using its own governing V<sub>des,θ</sub> from Section&nbsp;2. Walls are fully covered (Tables 5.2(A)&ndash;(C)) at every axis. Roofs
+      are covered for all pitches up to 45&deg; when wind is normal to the ridge (front/back axes, Tables 5.3(A)/(B)/(C)); for pitch
+      &ge;10&deg; with wind parallel to the ridge (side axes), source a C<sub>p,e</sub> value from the Standard directly &mdash; see the
+      note on each axis below. K<sub>a</sub>, K<sub>c</sub>, K<sub>l</sub>, K<sub>p</sub> are all taken as 1.0 (no area reduction / local
+      cladding factors) &mdash; apply these separately for cladding and fixing design.</p>
+
+    <div id="buildingTypeGate" class="warning" hidden></div>
+
     <div class="grid">
       <div class="field">
-        <label for="cshp">Drag shape factor, C<sub>shp</sub> <span class="ref">(Cl A.5.2.1)</span></label>
-        <input type="number" id="cshp" min="0" step="0.01" value="0.63" />
+        <label for="pVdes">Fallback design wind speed, V<sub>des,θ</sub> (m/s) <span class="ref">(used only if Section 2 hasn't been run)</span></label>
+        <input type="number" id="pVdes" min="0" step="0.1" value="40" />
       </div>
       <div class="field">
-        <label for="roofCase">Roof uplift case</label>
-        <select id="roofCase">
-          <option value="sealed" selected>Sealed roof (Cp,e = −0.8, Cp,i = 0)</option>
-          <option value="dominant">Sealed roof with dominant opening (Cp,i = +0.7)</option>
-          <option value="vented">Vented / open-top (Cp,i from Eq. A.5(5))</option>
-          <option value="none">No roof uplift</option>
+        <label for="pCdyn">Dynamic response factor, C<sub>dyn</sub> <span class="ref">(Section 6)</span></label>
+        <input type="number" id="pCdyn" min="1" step="0.01" value="1.0" />
+      </div>
+      <div class="field">
+        <label for="cpiCase">Internal pressure case <span class="ref">(Table 5.1(A))</span></label>
+        <select id="cpiCase"></select>
+      </div>
+    </div>
+
+    <p class="hint">Plan size (W × L), roof height and roof type/pitch are set in the Building section above.</p>
+
+    <button id="calcPressure" class="primary">Calculate wind pressures</button>
+
+    <div id="pressureResults" class="results" hidden></div>
+
+    <div id="pressureDiagrams" class="results" hidden>
+      <h3>Plan &amp; elevation pressure diagrams</h3>
+      <div class="field diagram-axis-picker">
+        <label for="pressureDiagramAxis">Direction to display</label>
+        <select id="pressureDiagramAxis"></select>
+      </div>
+      <div class="diagram-row">
+        <div class="compass-wrap">
+          <svg id="planViewSvg" viewBox="0 0 320 300" width="300" height="281" role="img" aria-label="Plan view of wind pressure on the building"></svg>
+          <p class="hint">Plan view, wind from the top. Windward/leeward strips across the top and bottom edges; side wall zones (windward
+            edge outward) down the left and right edges.</p>
+        </div>
+        <div class="compass-wrap">
+          <svg id="elevationViewSvg" viewBox="0 0 320 240" width="300" height="225" role="img" aria-label="Elevation view of wind pressure on the building"></svg>
+          <p class="hint">Elevation (section) along the wind path, wind from the left. Wall strips at each end; the roof line is coloured
+            where a value is available for this direction.</p>
+        </div>
+      </div>
+      <p class="note" id="pressureDiagramCaption"></p>
+    </div>
+  </section>
+
+  <!-- ============================= SECTION: OVERTURNING ============================= -->
+  <section class="card">
+    <h2>4. Overturning &amp; stability <span class="ref">(whole building, about the leeward base edge)</span></h2>
+    <p class="hint">Sums the wall and roof wind actions for each wind direction into a horizontal force, a roof uplift and an overturning
+      moment, and compares it with the restoring moment from self-weight: &gamma;<sub>G</sub>&middot;W&middot;d/2 &ge;
+      &gamma;<sub>W</sub>&middot;M<sub>OT</sub>. A rectangular building is checked for all 4 orthogonal axes and both roof load cases
+      (Clause 5.4.1); a circular tank is checked for the governing wind speed from any direction.</p>
+
+    <div class="grid">
+      <div class="field">
+        <label for="otWeight">Self-weight resisting overturning, W (kN)</label>
+        <input type="number" id="otWeight" min="0" step="1" value="400" />
+        <p class="hint">Permanent weight only, acting at the plan centre. Use the lightest case.</p>
+      </div>
+      <div class="field">
+        <label for="otGammaG">Factor on self-weight, &gamma;<sub>G</sub></label>
+        <input type="number" id="otGammaG" min="0" step="0.05" value="0.9" />
+      </div>
+      <div class="field">
+        <label for="otGammaW">Factor on wind, &gamma;<sub>W</sub></label>
+        <input type="number" id="otGammaW" min="0" step="0.05" value="1.0" />
+      </div>
+      <div class="field" id="otCpiWrap">
+        <label for="otInternal">Internal pressure under the roof</label>
+        <select id="otInternal">
+          <option value="include" selected>Include (largest Cp,i of the Section 3 case)</option>
+          <option value="ignore">Ignore (floor is part of the structure held down)</option>
+        </select>
+      </div>
+      <div class="field" id="otCshpWrap" hidden>
+        <label for="otCshp">Tank drag shape factor, C<sub>shp</sub> <span class="ref">(Cl A.5.2.1)</span></label>
+        <input type="number" id="otCshp" min="0" step="0.01" value="0.63" />
+      </div>
+      <div class="field" id="otRoofCpWrap" hidden>
+        <label for="otRoofCp">Tank roof net C<sub>p</sub> = C<sub>p,e</sub> &minus; C<sub>p,i</sub> <span class="ref">(Table A.4)</span></label>
+        <input type="number" id="otRoofCp" step="0.05" value="-0.8" />
+      </div>
+    </div>
+    <p class="hint">Defaults are the AS/NZS&nbsp;1170.0 stability combination (0.9G with W<sub>u</sub>) &mdash; use an ultimate R in Section&nbsp;2.
+      For a working-load check with a factor of safety instead, set &gamma;<sub>G</sub>&nbsp;=&nbsp;1.0 and &gamma;<sub>W</sub>&nbsp;=&nbsp;FoS.</p>
+
+    <button id="calcOverturning" class="primary">Calculate overturning &amp; hold-downs</button>
+
+    <div id="otResults" class="results" hidden></div>
+  </section>
+
+  <!-- ============================= SECTION: HOLD-DOWN POINTS ============================= -->
+  <section class="card">
+    <h2>5. Hold-down points</h2>
+    <p class="hint">The factored net vertical load and overturning moment are shared between the hold-down points as a rigid base:
+      R<sub>i</sub> = N/n + M&middot;s<sub>i</sub>&thinsp;/&thinsp;&Sigma;s<sub>i</sub>&sup2;, where s<sub>i</sub> is the point's distance downwind
+      of the group centroid. Negative R<sub>i</sub> is tension the hold-down must carry.</p>
+
+    <div class="grid" id="otRectInputs">
+      <div class="field">
+        <label for="otNW">Points across the width, n<sub>W</sub></label>
+        <input type="number" id="otNW" min="1" max="50" step="1" value="5" />
+      </div>
+      <div class="field">
+        <label for="otNL">Points along the length, n<sub>L</sub></label>
+        <input type="number" id="otNL" min="1" max="50" step="1" value="4" />
+      </div>
+      <div class="field">
+        <label for="otEdge">Edge distance from wall line (m)</label>
+        <input type="number" id="otEdge" min="0" step="0.05" value="0" />
+      </div>
+      <div class="field">
+        <label for="otLayout">Array layout</label>
+        <select id="otLayout">
+          <option value="perimeter" selected>Perimeter only</option>
+          <option value="grid">Full grid (perimeter + interior)</option>
         </select>
       </div>
     </div>
-    <div class="results" id="actionResults"></div>
-  </section>
-
-  <!-- ============================= 4. OVERTURNING ============================= -->
-  <section class="card">
-    <h2>4. Overturning about the leeward base edge</h2>
-    <div class="results first" id="momentResults"></div>
-  </section>
-
-  <!-- ============================= 5. EDGE REACTIONS ============================= -->
-  <section class="card">
-    <h2>5. Vertical base reactions &ndash; far (windward) &amp; near (leeward) edges</h2>
-    <p class="hint">Modelled as two edge supports one diameter apart. Net vertical N = W &minus; U at the centre; the wind couple shifts
-      reaction to the leeward edge: R = N/2 &plusmn; M/b. Positive = compression into the foundation; a negative far-side reaction
-      is net uplift that hold-down anchors must carry.</p>
-    <div class="grid">
+    <div class="grid" id="otCircleInputs" hidden>
       <div class="field">
-        <label for="reactionBasis">Moment used for reactions, M</label>
-        <select id="reactionBasis">
-          <option value="sheet" selected>M_OT = M_w + M_u (as spreadsheet, conservative)</option>
-          <option value="statics">M_w only (uplift taken through base centre)</option>
-        </select>
+        <label for="otPcd">Pitch circle diameter, PCD (m)</label>
+        <input type="number" id="otPcd" min="0.1" step="0.05" value="2.6" />
+      </div>
+      <div class="field">
+        <label for="otNPts">Number of hold-down points, n</label>
+        <input type="number" id="otNPts" min="3" max="72" step="1" value="6" />
       </div>
     </div>
-    <div class="split">
-      <div class="results first" id="edgeResults"></div>
-      <figure class="diagram">
-        <svg id="fbdSvg" viewBox="0 0 420 380" role="img" aria-label="Free-body diagram of the tank with base reactions"></svg>
-      </figure>
-    </div>
-  </section>
 
-  <!-- ============================= 6. N-POINT REACTIONS ============================= -->
-  <section class="card">
-    <h2>6. Circular base &ndash; n discrete reaction points</h2>
-    <p class="hint">Points spaced evenly around the base circle (radius R = b/2), point 1 at the farthest windward position.
-      Lever arm x<sub>i</sub> = R&middot;cos&thinsp;&theta;<sub>i</sub> along the wind. Rigid-base linear distribution:
-      R<sub>i</sub> = N/n &minus; M&middot;x<sub>i</sub> / &Sigma;x<sub>i</sub>&sup2;.</p>
-    <div class="grid">
-      <div class="field">
-        <label for="nPoints">Number of reaction points, n (3&ndash;12)</label>
-        <input type="number" id="nPoints" min="3" max="12" step="1" value="6" />
-      </div>
-    </div>
-    <div id="pointResults"></div>
-    <div class="split">
-      <div id="pointSummary"></div>
-      <figure class="diagram">
-        <svg id="planSvg" viewBox="0 0 380 340" role="img" aria-label="Plan of reaction points around the tank base"></svg>
-        <figcaption class="hint">Wind from the left. Blue = compression, amber = uplift (hold-down). Dotted line = geometric axis;
-          red dashed line = zero-reaction (neutral) axis where it falls near the base.</figcaption>
-      </figure>
-    </div>
-    <p class="note">For odd n there is no point at the leeward position (&theta; = 180&deg;), so the peak compression falls between
-      points. A flexible ring beam or a bolt group with prying will redistribute load &mdash; this is a rigid-base idealisation.</p>
+    <div id="otPointResults" class="results" hidden></div>
   </section>
 </main>
 
 <footer>
-  Based on the Overturning tab of Wind_Actions_AS-NZS1170.2.xlsx. Wind speed tables and functions (wind/data.js, wind/calc.js) are from
-  the Wind Actions to AS/NZS&nbsp;1170.2 calculator.
+  <p>Data source: AS/NZS 1170.2:2021 <em>Structural design actions &ndash; Part 2: Wind actions</em>, Sections 2&ndash;5.
+    Not affiliated with or endorsed by Standards Australia / Standards New Zealand.</p>
 </footer>
 
-<script src="wind/data.js"></script>
-<script src="wind/calc.js"></script>
-<script src="overturning.js"></script>
+<script src="data.js"></script>
+<script src="calc.js"></script>
 <script src="app.js"></script>
+<script src="overturning.js"></script>
+<script src="overturning-ui.js"></script>
 </body>
 </html>
