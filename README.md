@@ -43,6 +43,13 @@ h, roof type and pitch) or a circular bin / silo / tank (diameter D, height h).
 - Circular tank — governing V_des from any direction, wall drag C_shp = 0.63 at h/2 (Cl A.5.2.1) and
   uniform roof uplift, net C_p = −0.8 by default (Table A.4(A), sealed).
 
+**Elevated floor** — a floor (or tank base) height above natural surface can be set in Section 1.
+Walls then run from the floor to the roof with their forces acting at the raised height, the windward
+wall C_p,e becomes 0.8 (Table 5.2(A)), and the underside of the floor takes C_p,e = +0.8 / −0.6
+(Clause 5.4.1), reduced linearly where the clearance is less than h/3. Internal pressure is not
+applied (it acts on the roof and floor of the same structure and cancels). Hold-downs and the pivot
+stay at natural surface level; drag on sub-floor posts is not included.
+
 **Stability** about the leeward base edge: γ_G·W·d/2 ≥ γ_W·M_OT, where
 M_OT = ΣF·z + ΣU·(lever to the leeward edge). Defaults γ_G = 0.9, γ_W = 1.0 (AS/NZS 1170.0 stability
 combination with ultimate wind). For a working-load factor-of-safety check use γ_G = 1.0, γ_W = FoS.

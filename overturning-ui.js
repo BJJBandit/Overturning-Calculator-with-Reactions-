@@ -20,6 +20,12 @@ function otIsCircle() {
   return $("buildingType").value === "bins";
 }
 
+// Floor (or tank base) height above natural surface, kept below the roof height.
+function otFloorHeight() {
+  const h = Math.max(0.1, otNum("bldH", 1));
+  return Math.min(Math.max(0, otNum("otFloorH", 0)), 0.9 * h);
+}
+
 // ---------------------------------------------------------------------------
 // Shape-dependent form state
 // ---------------------------------------------------------------------------
@@ -38,12 +44,21 @@ function otRefreshShape() {
     $(id).closest(".field").hidden = circle;
   });
   otSetLabel("bldB", circle ? "Tank diameter, D (m)" : "");
-  otSetLabel("bldH", circle ? "Tank height, h = z (m)" : "");
+  otSetLabel("bldH", circle ? "Height to top of tank above natural surface, h = z (m)" : "Average roof height above natural surface, h = z (m)");
+  otSetLabel("otFloorH", circle ? "Tank base height above natural surface (m)" : "");
   $("otRectInputs").hidden = circle;
   $("otCircleInputs").hidden = !circle;
   $("otCpiWrap").hidden = circle;
+  otRefreshFloor();
   $("otCshpWrap").hidden = !circle;
   $("otRoofCpWrap").hidden = !circle;
+}
+
+// Internal pressure under the roof does not apply once the floor is elevated (see otBuildLoadCases).
+function otRefreshFloor() {
+  const elevated = otFloorHeight() > 0;
+  $("otInternal").disabled = elevated;
+  $("otInternal").title = elevated ? "Not applied with an elevated floor: internal pressure on the roof and floor cancels" : "";
 }
 
 function otSetupBuildingTypes() {
@@ -98,11 +113,12 @@ function otBuildLoadCases() {
   const h = Math.max(0.1, otNum("bldH", 1));
   const bldB = Math.max(0.1, otNum("bldB", 1));
   const bldD = Math.max(0.1, otNum("bldD", 1));
+  const floorH = otFloorHeight();
   const axes = lastDesignResults;
 
   if (otIsCircle()) {
     const Vdes = Math.max(...axes.map((a) => a.Vdes));
-    const actions = otTankActions({ Vdes, Cdyn, D: bldB, h, Cshp: Math.max(0, otNum("otCshp", OT_TANK_CSHP)), roofCp: otNum("otRoofCp", OT_TANK_ROOF_CP) });
+    const actions = otTankActions({ Vdes, Cdyn, D: bldB, h, floorH, Cshp: Math.max(0, otNum("otCshp", OT_TANK_CSHP)), roofCp: otNum("otRoofCp", OT_TANK_ROOF_CP) });
     const c = actions.cases[0];
     return [{ axisIndex: 0, axisLabel: "Any direction", caseLabel: "", Vdes, actions, c, d: bldB, travel: [0, 1], st: otStability(c, bldB, W, gammaG, gammaW) }];
   }
@@ -110,7 +126,9 @@ function otBuildLoadCases() {
   const pitch = otNum("roofPitch", 0);
   const roofType = $("roofType").value || "gable";
   let cpi = 0;
-  if ($("otInternal").value === "include") {
+  // With an elevated floor the internal pressure pushes up on the roof and down on the floor of the
+  // same structure, so it cancels -- the floor underside pressure is applied instead.
+  if (floorH === 0 && $("otInternal").value === "include") {
     const cpiCase = CPI_CASES.find((x) => x.id === $("cpiCase").value);
     cpi = cpiCase.cpi === "cpe_ww" ? cpeWindwardWall(h) : Math.max(...cpiCase.cpi);
   }
@@ -119,7 +137,7 @@ function otBuildLoadCases() {
     const ridgeTheta = i % 2 === 0 ? 0 : 90;
     const b = ridgeTheta === 0 ? bldB : bldD;
     const d = ridgeTheta === 0 ? bldD : bldB;
-    const actions = otBuildingActions({ Vdes: axis.Vdes, Cdyn, b, d, h, pitch, roofType, ridgeTheta, cpi });
+    const actions = otBuildingActions({ Vdes: axis.Vdes, Cdyn, b, d, h, floorH, pitch, roofType, ridgeTheta, cpi });
     return actions.cases.map((c) => ({
       axisIndex: i, axisLabel: axis.label, caseLabel: c.label, Vdes: axis.Vdes, actions, c, d,
       travel: OT_AXIS_TRAVEL[i], st: otStability(c, d, W, gammaG, gammaW),
@@ -142,8 +160,15 @@ function otFbdSvg(lc) {
   const right = left + w;
   const top = ground - ht;
 
+  const floorPx = otFloorHeight() * scale;
   let s = `<line x1="40" y1="${ground}" x2="400" y2="${ground}" class="ot-ground" />`;
-  s += `<rect x="${left}" y="${top}" width="${w}" height="${ht}" class="ot-outline" />`;
+  s += `<rect x="${left}" y="${top}" width="${w}" height="${ht - floorPx}" class="ot-outline" />`;
+  if (floorPx > 0) {
+    [0.04, 0.5, 0.96].forEach((f) => {
+      s += `<line x1="${left + f * w}" y1="${ground - floorPx}" x2="${left + f * w}" y2="${ground}" class="ot-ground" />`;
+    });
+    s += otText(left - 8, ground - floorPx / 2 + 4, `floor ${fmt(otFloorHeight(), 2)} m`, "ot-text", "end");
+  }
 
   const zF = c.Fh !== 0 ? Math.min(h, Math.max(0, c.Mh / c.Fh)) : h / 2;
   const yF = ground - zF * scale;
@@ -160,7 +185,7 @@ function otFbdSvg(lc) {
   }
 
   const cx = left + w / 2;
-  const midY = ground - ht / 2;
+  const midY = ground - floorPx - (ht - floorPx) / 2;
   s += otArrow(cx, midY - 24, cx, midY + 24, "ot-c-weight");
   s += otText(cx, midY + 40, `W = ${fmt(otNum("otWeight", 0), 1)} kN`, "ot-label ot-c-weight");
 
@@ -313,7 +338,43 @@ function otWireFootingDropdowns() {
   });
 }
 
-function otPlanSvg(layout, env) {
+
+// Geometric axis (through the centroid of the points, across the wind) and neutral axis (line of zero
+// reaction) for one load case, with the distance between them dimensioned. `axes` = { travel, s0 },
+// s0 = neutral-axis position downwind of the centroid (negative = toward windward), or null.
+function otPlanAxes(layout, axes, cx, cy, scale) {
+  const [tx, ty] = axes.travel;
+  const px = -ty; // unit vector along the axes (across the wind)
+  const py = tx;
+  const acrossWind = layout.circle ? Math.max(otNum("bldB", 1), layout.pcd) : tx === 0 ? layout.W : layout.L;
+  const alongWind = layout.circle ? acrossWind : tx === 0 ? layout.L : layout.W;
+  const half = (acrossWind / 2) * scale + 8;
+  const line = (s, cls) => {
+    const ox = cx + s * tx * scale;
+    const oy = cy + s * ty * scale;
+    return `<line x1="${(ox - px * half).toFixed(1)}" y1="${(oy - py * half).toFixed(1)}" x2="${(ox + px * half).toFixed(1)}" y2="${(oy + py * half).toFixed(1)}" class="${cls}" />`;
+  };
+
+  let s = line(0, "ot-axis-geo");
+  if (axes.s0 === null || Math.abs(axes.s0) * scale > (alongWind / 2) * scale + 30) return s; // neutral axis off the drawing
+  s += line(axes.s0, "ot-axis-neutral");
+
+  // dimension between the two axes, set in from one end of the lines
+  const off = layout.circle ? half * 0.45 : half - 34; // clear of the point numbers
+  const ax = cx + px * off;
+  const ay = cy + py * off;
+  const bx = ax + axes.s0 * tx * scale;
+  const by = ay + axes.s0 * ty * scale;
+  const tick = (x, y) => `<line x1="${(x - px * 5).toFixed(1)}" y1="${(y - py * 5).toFixed(1)}" x2="${(x + px * 5).toFixed(1)}" y2="${(y + py * 5).toFixed(1)}" class="ot-dim" />`;
+  s += `<line x1="${ax.toFixed(1)}" y1="${ay.toFixed(1)}" x2="${bx.toFixed(1)}" y2="${by.toFixed(1)}" class="ot-dim" />` + tick(ax, ay) + tick(bx, by);
+  const text = `${fmt(Math.abs(axes.s0), 2)} m`;
+  const mx = (ax + bx) / 2;
+  const my = (ay + by) / 2;
+  s += tx === 0 ? otText(mx - px * 8, my + 4, text, "ot-dim-text", px > 0 ? "end" : "start") : otText(mx, my - py * 8 + (py > 0 ? 0 : 8), text, "ot-dim-text");
+  return s;
+}
+
+function otPlanSvg(layout, env, axes) {
   const cx = 220;
   const cy = 190;
   const circle = layout.circle;
@@ -334,7 +395,7 @@ function otPlanSvg(layout, env) {
     s += otArrow(cx, cy + hl + 44, cx, cy + hl + 12, "ot-c-wind") + otText(cx + 10, cy + hl + 38, "θ=180°", "ot-label ot-c-wind", "start");
     s += otArrow(cx + hw + 44, cy, cx + hw + 12, cy, "ot-c-wind") + otText(cx + hw + 14, cy - 10, "θ=90°", "ot-label ot-c-wind", "start");
     s += otArrow(cx - hw - 44, cy, cx - hw - 12, cy, "ot-c-wind") + otText(cx - hw - 14, cy - 10, "θ=270°", "ot-label ot-c-wind", "end");
-    s += otText(cx, cy + 4, `W ${fmt(layout.W, 1)} × L ${fmt(layout.L, 1)} m`, "ot-text");
+    s += otText(cx - hw, cy - hl - 8, `W ${fmt(layout.W, 1)} × L ${fmt(layout.L, 1)} m`, "ot-text", "start");
   }
 
   const n = layout.pts.length;
@@ -349,6 +410,7 @@ function otPlanSvg(layout, env) {
       s += otText((px - (p.X / len) * 16).toFixed(1), (py - (p.Y / len) * 16 + 3.5).toFixed(1), i + 1, "ot-ptnum");
     }
   });
+  s += otPlanAxes(layout, axes, cx, cy, scale);
   return `<svg viewBox="0 0 440 380" role="img" aria-label="Plan of hold-down points">${s}</svg>`;
 }
 
@@ -400,6 +462,15 @@ function otRenderPoints(loadCases) {
   otShowCalculatedFooting(diaGiven ? "otFootDepth" : "otFootDia", maxVol > 0 ? `${otherMm} mm (calculated minimum)` : "not required");
   const otherName = diaGiven ? "depth" : "diameter";
 
+  // Neutral axis (zero reaction) for the load case giving the largest tension: R(s) = N/n + M s / sum(s^2) = 0
+  const govCase = worstT.minCase;
+  const govResult = usable.find((r) => r.lc === govCase);
+  const s0 = govCase.st.Mc !== 0 ? -((govCase.st.N / n) * govResult.sumS2) / govCase.st.Mc : null;
+  const axes = { travel: govCase.travel, s0 };
+  const s0Text = s0 === null
+    ? "there is no overturning moment, so no neutral axis"
+    : `the neutral axis is ${fmt(Math.abs(s0), 2)} m to ${s0 < 0 ? "windward" : "leeward"} of the geometric axis`;
+
   const headline = `<div class="ot-headline">
     ${otStat("Hold-down points", n, "", layout.circle
       ? `on a ${fmt(layout.pcd, 2)} m PCD, ${fmt(360 / n, 1)}° apart`
@@ -448,9 +519,12 @@ function otRenderPoints(loadCases) {
           <tbody>${rows}</tbody>
         </table></div>
       </div>
-      <figure class="ot-diagram">${otPlanSvg(layout, env)}
+      <figure class="ot-diagram">${otPlanSvg(layout, env, axes)}
         <figcaption class="hint">Plan. Amber = point goes into tension in at least one load case, blue = compression only.
-          ${layout.circle ? "Dashed circle = PCD; point 1 is at the windward position, numbered clockwise." : "Points numbered row by row from the θ=0° windward face."}</figcaption>
+          ${layout.circle ? "Dashed circle = PCD; point 1 is at the windward position, numbered clockwise." : "Points numbered row by row from the θ=0° windward face."}
+          Dotted line = geometric axis through the centroid of the points; red dashed line = neutral axis (zero reaction) for the
+          load case with the largest tension (${otCaseName(govCase)}) &mdash; ${s0Text}. Points on the windward side of the neutral
+          axis are in tension for that case.</figcaption>
       </figure>
     </div>
     <p class="note">${tensionPts} of ${n} points need hold-down capacity. X is measured across W and Y along L from the plan centre.
@@ -468,6 +542,7 @@ function otRenderPoints(loadCases) {
 // ---------------------------------------------------------------------------
 
 function otRunAll() {
+  otRefreshFloor();
   runSpeedCalc();
   if (!otIsCircle()) renderPressureResults();
   const loadCases = otBuildLoadCases();

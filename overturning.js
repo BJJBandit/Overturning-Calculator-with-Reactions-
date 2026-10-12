@@ -24,13 +24,22 @@ function otRoofZones(hd, h, d) {
     .map((z) => ({ label: `Roof, ${z.label}`, x0: z.from * h, x1: Math.min(z.to * h, d), cpe: z.values }));
 }
 
+// Clause 5.4.1: underside of an elevated building, Cp,e = +0.8 and -0.6, reduced linearly to zero
+// where the clearance underneath is less than one-third of the height. Returns [upward case, downward case].
+function otUndersideCp(floorH, h) {
+  const k = Math.max(0, Math.min(1, floorH / (h / 3)));
+  return [0.8 * k, -0.6 * k];
+}
+
 // Returns the two Clause 5.4.1 roof load cases for one wind direction, each as lists of horizontal
 // forces { label, cp, F, z } and roof uplift pieces { label, cp, U, x }, in kN and m (unfactored).
 // cpi is the internal pressure coefficient acting on the underside of the roof (0 to ignore it).
-function otBuildingActions({ Vdes, Cdyn, b, d, h, pitch, roofType, ridgeTheta, cpi }) {
+function otBuildingActions({ Vdes, Cdyn, b, d, h, floorH, pitch, roofType, ridgeTheta, cpi }) {
   const q = windPressure(Vdes, 1, Cdyn) / 1000; // kPa
   const hd = h / d;
-  const cpeWw = cpeWindwardWall(h);
+  // Table 5.2(A): 0.8 for an elevated building, otherwise the on-ground value
+  const cpeWw = floorH > 0 ? 0.8 : cpeWindwardWall(h);
+  const under = otUndersideCp(floorH, h);
   const cpeLw = cpeLeewardWall({ theta: ridgeTheta, pitch, db: d / b, roofType });
 
   // Roof slope geometry only matters when the wind is normal to the ridge on a pitched roof --
@@ -43,9 +52,12 @@ function otBuildingActions({ Vdes, Cdyn, b, d, h, pitch, roofType, ridgeTheta, c
   const notes = [];
 
   const cases = [0, 1].map((k) => {
+    // walls run from the floor (floorH above natural surface) up to the eave
+    const wallWw = Math.max(0, hWw - floorH);
+    const wallLw = Math.max(0, hLw - floorH);
     const horizontal = [
-      { label: "Windward wall", cp: cpeWw, F: cpeWw * q * b * hWw, z: hWw / 2 },
-      { label: "Leeward wall", cp: cpeLw, F: -cpeLw * q * b * hLw, z: hLw / 2 },
+      { label: "Windward wall", cp: cpeWw, F: cpeWw * q * b * wallWw, z: floorH + wallWw / 2 },
+      { label: "Leeward wall", cp: cpeLw, F: -cpeLw * q * b * wallLw, z: floorH + wallLw / 2 },
     ];
     const uplift = [];
     const addRoof = (label, cpe, x0, x1) => {
@@ -68,6 +80,10 @@ function otBuildingActions({ Vdes, Cdyn, b, d, h, pitch, roofType, ridgeTheta, c
     } else {
       otRoofZones(hd, h, d).forEach((z) => addRoof(z.label, z.cpe[k], z.x0, z.x1));
     }
+    if (floorH > 0) {
+      // pressure on the underside of the floor pushes up (+) or pulls down (-); uniform, so it acts at d/2
+      uplift.push({ label: "Floor underside", cp: under[k], U: under[k] * q * b * d, x: d / 2 });
+    }
 
     const Fh = horizontal.reduce((a, f) => a + f.F, 0);
     const Mh = horizontal.reduce((a, f) => a + f.F * f.z, 0);
@@ -80,6 +96,9 @@ function otBuildingActions({ Vdes, Cdyn, b, d, h, pitch, roofType, ridgeTheta, c
     };
   });
 
+  if (floorH > 0) {
+    notes.push(`Elevated floor: windward wall C<sub>p,e</sub> = 0.8 (Table 5.2(A)); floor underside C<sub>p,e</sub> = ${under[0].toFixed(2)} (max uplift case) and ${under[1].toFixed(2)} (min uplift case), Clause 5.4.1. Wind drag on the sub-floor posts and bracing is not included.`);
+  }
   if (pitched && roofType === "hip") {
     notes.push("Hip roof: roof forces are taken on the gable-equivalent upwind / downwind slopes (hip ends ignored).");
   }
@@ -97,15 +116,24 @@ function otBuildingActions({ Vdes, Cdyn, b, d, h, pitch, roofType, ridgeTheta, c
 
 // -- Wind actions on a circular bin, silo or tank (any direction) --------------
 
-function otTankActions({ Vdes, Cdyn, D, h, Cshp, roofCp }) {
+function otTankActions({ Vdes, Cdyn, D, h, floorH, Cshp, roofCp }) {
   const q = windPressure(Vdes, 1, Cdyn) / 1000;
-  const horizontal = [{ label: "Wall drag", cp: Cshp, F: Cshp * q * D * h, z: h / 2 }];
-  const U = -roofCp * q * (Math.PI * D * D) / 4;
-  const uplift = [{ label: "Roof", cp: roofCp, U, x: D / 2 }];
+  const area = (Math.PI * D * D) / 4;
+  const wall = Math.max(0, h - floorH); // shell height above the elevated base
+  const zF = floorH + wall / 2;
+  const horizontal = [{ label: "Wall drag", cp: Cshp, F: Cshp * q * D * wall, z: zF }];
+  const uplift = [{ label: "Roof", cp: roofCp, U: -roofCp * q * area, x: D / 2 }];
+  const notes = [];
+  if (floorH > 0) {
+    const under = otUndersideCp(floorH, h)[0];
+    uplift.push({ label: "Base underside", cp: under, U: under * q * area, x: D / 2 });
+    notes.push(`Elevated base: underside C<sub>p,e</sub> = ${under.toFixed(2)} taken as for an elevated building (Clause 5.4.1). Wind drag on the support structure is not included.`);
+  }
   const Fh = horizontal[0].F;
+  const U = uplift.reduce((a, u) => a + u.U, 0);
   return {
-    q, b: D, d: D, h, cpi: 0, notes: [],
-    cases: [{ label: "", horizontal, uplift, Fh, Mh: Fh * (h / 2), U, MuCentre: 0, MuEdge: U * (D / 2) }],
+    q, b: D, d: D, h, cpi: 0, notes,
+    cases: [{ label: "", horizontal, uplift, Fh, Mh: Fh * zF, U, MuCentre: 0, MuEdge: U * (D / 2) }],
   };
 }
 
