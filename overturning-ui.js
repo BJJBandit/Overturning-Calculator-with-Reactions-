@@ -349,6 +349,13 @@ function otRenderPoints(loadCases) {
   const tensionPts = env.filter((e) => e.minR < 0).length;
   const maxT = Math.max(0, -worstT.minR);
 
+  // Concrete footing at each point: its weight must equal FoS x the point's hold-down tension.
+  const fos = Math.max(1, otNum("otFos", 1.5));
+  const concrete = Math.max(1, otNum("otConcrete", 24));
+  const volumes = env.map((e) => otFootingVolume(Math.max(0, -e.minR), fos, concrete));
+  const maxVol = Math.max(...volumes);
+  const totalVol = volumes.reduce((a, v) => a + v, 0);
+
   const headline = `<div class="ot-headline">
     ${otStat("Hold-down points", n, "", layout.circle
       ? `on a ${fmt(layout.pcd, 2)} m PCD, ${fmt(360 / n, 1)}° apart`
@@ -356,6 +363,8 @@ function otRenderPoints(loadCases) {
     ${otStat("Max hold-down tension per point", fmt(maxT, 1), "kN", maxT > 0 ? otCaseName(worstT.minCase) : "no point goes into tension")}
     ${otStat("Max compression per point", fmt(Math.max(0, worstC.maxR), 1), "kN", otCaseName(worstC.maxCase))}
     ${otStat("Shear per point", fmt(maxV / n, 1), "kN", "base shear shared equally")}
+    ${otStat("Min footing volume, largest point", fmt(maxVol, 2), "m³", `FoS ${fmt(fos, 1)} × ${fmt(maxT, 1)} kN ÷ ${fmt(concrete, 1)} kN/m³`)}
+    ${otStat("Min footing volume, all points", fmt(totalVol, 2), "m³", `${tensionPts} footings, ${fmt(totalVol * concrete, 0)} kN of concrete`)}
   </div>`;
 
   // Per-direction minimum reaction (most tension) for each point
@@ -370,7 +379,8 @@ function otRenderPoints(loadCases) {
       <td class="num">${fmt(p.X, 2)}</td><td class="num">${fmt(p.Y, 2)}</td>
       ${axisIds.map((a) => cell(axisMin(i, a))).join("")}
       <td class="num">${env[i].minR < 0 ? `<span class="ot-tension">${fmt(-env[i].minR, 1)}</span>` : fmt(0, 1)}</td>
-      <td class="num">${fmt(Math.max(0, env[i].maxR), 1)}</td></tr>`)
+      <td class="num">${fmt(Math.max(0, env[i].maxR), 1)}</td>
+      <td class="num">${fmt(volumes[i], 2)}</td></tr>`)
     .join("");
 
   const warn = unstable.length
@@ -387,7 +397,7 @@ function otRenderPoints(loadCases) {
         <div class="ot-table-wrap tall"><table>
           <thead><tr><th>Point</th>${layout.circle ? '<th class="num">Angle (°)</th>' : ""}<th class="num">X (m)</th><th class="num">Y (m)</th>
             ${axisIds.map((a) => `<th class="num">Min R, ${axisLabel(a).replace(" (front)", "")}</th>`).join("")}
-            <th class="num">Hold-down tension</th><th class="num">Max compression</th></tr></thead>
+            <th class="num">Hold-down tension</th><th class="num">Max compression</th><th class="num">Min footing (m³)</th></tr></thead>
           <tbody>${rows}</tbody>
         </table></div>
       </div>
@@ -398,7 +408,10 @@ function otRenderPoints(loadCases) {
     </div>
     <p class="note">${tensionPts} of ${n} points need hold-down capacity. X is measured across W and Y along L from the plan centre.
       ${layout.circle ? "With point 1 directly windward the tension in it is the largest any point can see for wind from any direction." : ""}
-      Tension shown is the factored design action &mdash; no additional factor of safety is applied. The rigid-base model assumes every point
+      Tension shown is the factored design action from Section&nbsp;4. Minimum footing volume = FoS &times; hold-down tension &divide;
+      concrete unit weight, for each point's own worst load case; it counts the concrete's weight only (no soil on the footing, no
+      friction or side resistance) and is not reduced by &gamma;<sub>G</sub>. The FoS is applied on top of the Section&nbsp;4 load factors
+      &mdash; for a pure factor-of-safety check set &gamma;<sub>G</sub> and &gamma;<sub>W</sub> to 1.0. The rigid-base model assumes every point
       can take both tension and compression; a flexible base or bearing on a slab between points will redistribute load.</p>`;
 }
 

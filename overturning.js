@@ -157,6 +157,14 @@ function otCirclePoints({ pcd, n }) {
   return { pts };
 }
 
+// -- Concrete footing ----------------------------------------------------------
+
+// Minimum concrete volume (m3) whose weight resists a hold-down tension T (kN) with the given
+// factor of safety: fos x T <= unitWeight x volume.
+function otFootingVolume(T, fos, unitWeight) {
+  return (fos * T) / unitWeight;
+}
+
 // -- Hold-down point reactions -------------------------------------------------
 
 // Rigid base, linear distribution about the centroid of the point group:

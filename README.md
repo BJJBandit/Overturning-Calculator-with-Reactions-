@@ -58,6 +58,12 @@ R_i = N/n + M·s_i / Σs_i², with N = γ_G·W − γ_W·U, M the factored overt
 centre at base level, and s_i the point's distance downwind of the centroid. Each point reports its
 minimum reaction per wind direction and the envelope hold-down tension and compression.
 
+**Concrete footings** — with the desired factor of safety (FoS) chosen in Section 5, each point's
+minimum footing volume is FoS × hold-down tension ÷ concrete unit weight (24 kN/m³ by default),
+reported per point, for the largest point and in total. Only the concrete's weight is counted (no
+soil cover, friction or side resistance), and the FoS is applied on top of the Section 4 load
+factors — set γ_G and γ_W to 1.0 for a pure factor-of-safety check.
+
 ## Assumptions and limits
 
 - Preliminary hand check only; have results verified by a qualified structural engineer.
