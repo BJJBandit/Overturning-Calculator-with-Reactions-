@@ -165,6 +165,16 @@ function otFootingVolume(T, fos, unitWeight) {
   return (fos * T) / unitWeight;
 }
 
+// Round (cylindrical) footing, volume = pi D^2 / 4 x depth. Given the volume and one dimension (m),
+// returns the minimum value of the other.
+function otFootingDepth(volume, diameter) {
+  return volume / ((Math.PI * diameter * diameter) / 4);
+}
+
+function otFootingDiameter(volume, depth) {
+  return Math.sqrt((4 * volume) / (Math.PI * depth));
+}
+
 // -- Hold-down point reactions -------------------------------------------------
 
 // Rigid base, linear distribution about the centroid of the point group:

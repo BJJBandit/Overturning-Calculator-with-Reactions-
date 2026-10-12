@@ -278,6 +278,37 @@ function otReadPoints() {
   return { ...otRectPoints({ W, L, nW, nL, edge, perimeterOnly: $("otLayout").value === "perimeter" }), circle: false, W, L, nW, nL };
 }
 
+// Which footing dropdown the user set last ("otFootDia" or "otFootDepth") -- the other one is calculated.
+let otFootingDriver = "otFootDia";
+
+// Shows the calculated dimension in the non-driver dropdown as an extra, selected option, and
+// clears any such option left in the driver dropdown.
+function otShowCalculatedFooting(selectId, text) {
+  ["otFootDia", "otFootDepth"].forEach((id) => {
+    const sel = $(id);
+    let opt = sel.querySelector('option[value="calc"]');
+    if (id !== selectId) {
+      if (opt) opt.remove();
+      return;
+    }
+    if (!opt) {
+      opt = document.createElement("option");
+      opt.value = "calc";
+      sel.insertBefore(opt, sel.firstChild);
+    }
+    opt.textContent = text;
+    sel.value = "calc";
+  });
+}
+
+function otWireFootingDropdowns() {
+  ["otFootDia", "otFootDepth"].forEach((id) => {
+    $(id).addEventListener("change", () => {
+      if ($(id).value !== "calc") otFootingDriver = id;
+    });
+  });
+}
+
 function otPlanSvg(layout, env) {
   const cx = 220;
   const cy = 190;
@@ -356,6 +387,15 @@ function otRenderPoints(loadCases) {
   const maxVol = Math.max(...volumes);
   const totalVol = volumes.reduce((a, v) => a + v, 0);
 
+  // Round footing: the dropdown the user set last is the given dimension, the other is calculated.
+  const diaGiven = otFootingDriver === "otFootDia";
+  const given = otNum(otFootingDriver, 600) / 1000;
+  const otherDim = (vol) => (diaGiven ? otFootingDepth(vol, given) : otFootingDiameter(vol, given));
+  const maxOther = otherDim(maxVol);
+  const otherMm = Math.ceil((maxOther * 1000) / 10 - 1e-6) * 10; // rounded up to 10 mm
+  otShowCalculatedFooting(diaGiven ? "otFootDepth" : "otFootDia", maxVol > 0 ? `${otherMm} mm (calculated minimum)` : "not required");
+  const otherName = diaGiven ? "depth" : "diameter";
+
   const headline = `<div class="ot-headline">
     ${otStat("Hold-down points", n, "", layout.circle
       ? `on a ${fmt(layout.pcd, 2)} m PCD, ${fmt(360 / n, 1)}° apart`
@@ -365,6 +405,8 @@ function otRenderPoints(loadCases) {
     ${otStat("Shear per point", fmt(maxV / n, 1), "kN", "base shear shared equally")}
     ${otStat("Min footing volume, largest point", fmt(maxVol, 2), "m³", `FoS ${fmt(fos, 1)} × ${fmt(maxT, 1)} kN ÷ ${fmt(concrete, 1)} kN/m³`)}
     ${otStat("Min footing volume, all points", fmt(totalVol, 2), "m³", `${tensionPts} footings, ${fmt(totalVol * concrete, 0)} kN of concrete`)}
+    ${otStat(`Min footing ${otherName}, largest point`, maxVol > 0 ? otherMm : 0, "mm",
+      diaGiven ? `round footing, ${fmt(given * 1000, 0)} mm diameter` : `round footing, ${fmt(given * 1000, 0)} mm deep`)}
   </div>`;
 
   // Per-direction minimum reaction (most tension) for each point
@@ -380,7 +422,8 @@ function otRenderPoints(loadCases) {
       ${axisIds.map((a) => cell(axisMin(i, a))).join("")}
       <td class="num">${env[i].minR < 0 ? `<span class="ot-tension">${fmt(-env[i].minR, 1)}</span>` : fmt(0, 1)}</td>
       <td class="num">${fmt(Math.max(0, env[i].maxR), 1)}</td>
-      <td class="num">${fmt(volumes[i], 2)}</td></tr>`)
+      <td class="num">${fmt(volumes[i], 2)}</td>
+      <td class="num">${fmt(otherDim(volumes[i]), 2)}</td></tr>`)
     .join("");
 
   const warn = unstable.length
@@ -397,7 +440,7 @@ function otRenderPoints(loadCases) {
         <div class="ot-table-wrap tall"><table>
           <thead><tr><th>Point</th>${layout.circle ? '<th class="num">Angle (°)</th>' : ""}<th class="num">X (m)</th><th class="num">Y (m)</th>
             ${axisIds.map((a) => `<th class="num">Min R, ${axisLabel(a).replace(" (front)", "")}</th>`).join("")}
-            <th class="num">Hold-down tension</th><th class="num">Max compression</th><th class="num">Min footing (m³)</th></tr></thead>
+            <th class="num">Hold-down tension</th><th class="num">Max compression</th><th class="num">Min footing (m³)</th><th class="num">Min ${otherName} (m)</th></tr></thead>
           <tbody>${rows}</tbody>
         </table></div>
       </div>
@@ -410,7 +453,8 @@ function otRenderPoints(loadCases) {
       ${layout.circle ? "With point 1 directly windward the tension in it is the largest any point can see for wind from any direction." : ""}
       Tension shown is the factored design action from Section&nbsp;4. Minimum footing volume = FoS &times; hold-down tension &divide;
       concrete unit weight, for each point's own worst load case; it counts the concrete's weight only (no soil on the footing, no
-      friction or side resistance) and is not reduced by &gamma;<sub>G</sub>. The FoS is applied on top of the Section&nbsp;4 load factors
+      friction or side resistance) and is not reduced by &gamma;<sub>G</sub>. Footing depth / diameter is for a round footing,
+      volume = &pi;D&sup2;/4 &times; depth, sized on weight alone. The FoS is applied on top of the Section&nbsp;4 load factors
       &mdash; for a pure factor-of-safety check set &gamma;<sub>G</sub> and &gamma;<sub>W</sub> to 1.0. The rigid-base model assumes every point
       can take both tension and compression; a flexible base or bearing on a slab between points will redistribute load.</p>`;
 }
@@ -430,6 +474,7 @@ function otRunAll() {
 
 document.addEventListener("DOMContentLoaded", () => {
   otSetupBuildingTypes();
+  otWireFootingDropdowns();
   $("calcOverturning").addEventListener("click", otRunAll);
 
   // Once calculated, keep every section in step with the inputs.

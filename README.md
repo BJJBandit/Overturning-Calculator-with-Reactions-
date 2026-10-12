@@ -62,7 +62,9 @@ minimum reaction per wind direction and the envelope hold-down tension and compr
 minimum footing volume is FoS × hold-down tension ÷ concrete unit weight (24 kN/m³ by default),
 reported per point, for the largest point and in total. Only the concrete's weight is counted (no
 soil cover, friction or side resistance), and the FoS is applied on top of the Section 4 load
-factors — set γ_G and γ_W to 1.0 for a pure factor-of-safety check.
+factors — set γ_G and γ_W to 1.0 for a pure factor-of-safety check. Pick either a footing
+diameter or a footing depth from the dropdowns and the other is filled in with the minimum for a round
+footing (volume = π D²/4 × depth) at the largest point; the table gives it for every point.
 
 ## Assumptions and limits
 
